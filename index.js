@@ -84,7 +84,7 @@ client.on("messageCreate", async (message) => {
   }
 });
 
-if (content.includes("liette")) {
+if (message.content.toLowerCase().includes("liette")) {
   flavor = "Ah, Liette. That one I like. Short, sweet, and just cryptic enough.";
 }
 if (content.includes("dark oracle")) {
