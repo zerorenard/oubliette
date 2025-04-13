@@ -1,40 +1,46 @@
-import { Client, GatewayIntentBits } from 'discord.js';
-import 'dotenv/config';
-import supabase from './supabase.js';
+import { Client, GatewayIntentBits } from "discord.js";
+import OpenAI from "openai";
+import "dotenv/config";
 
-// Fetch bot personality on startup
-async function fetchOubliette() {
-  const { data, error } = await supabase
-    .from("bot_personality")
-    .select("*")
-    .eq("id", 1)
-    .single();
-
-  if (error) {
-    console.error("Error fetching personality data:", error);
-  } else {
-    console.log("Oubliette’s personality:", data);
-  }
-}
-
-// Set up Discord bot
+// Discord setup
 const client = new Client({
   intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent],
 });
 
-client.once('ready', () => {
-  console.log(`Oubliette is online as ${client.user.tag}`);
-  fetchOubliette(); // Only fetch personality once bot is ready
+// OpenAI setup
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
 });
 
-client.on('messageCreate', async (message) => {
+// When bot is ready
+client.once("ready", () => {
+  console.log(`Logged in as ${client.user.tag}`);
+});
+
+// When a message is received
+client.on("messageCreate", async (message) => {
   if (message.author.bot) return;
 
-  if (message.content === '!hello') {
-    message.channel.send(`Hello, ${message.author.username}. I remember everything.`);
+  try {
+    const response = await openai.chat.completions.create({
+      model: "gpt-3.5-turbo",
+      messages: [
+        { role: "system", content: "You are Oubliette, a smart, mysterious, slightly snarky AI assistant with an ancient knowledge core." },
+        { role: "user", content: message.content },
+      ],
+    });
+
+    const reply = response.choices[0]?.message?.content;
+    if (reply) {
+      message.reply(reply);
+    }
+  } catch (error) {
+    console.error("OpenAI error:", error);
+    message.reply("Hmm... something went wrong with my mind palace.");
   }
 });
 
+// Login to Discord
 client.login(process.env.DISCORD_TOKEN);
 
 import express from 'express';
