@@ -1,9 +1,43 @@
-import { createClient } from '@supabase/supabase-js';
+import supabase from "./supabase.js";
 
-// Load environment variables (see Step 2 below)
-const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseKey = process.env.SUPABASE_KEY;
+// Default appreciation score for users not in the matrix
+const DEFAULT_APPRECIATION = 5;
+const MAX_APPRECIATION = 10;
+const MIN_DELAY_MS = 0;
+const MAX_DELAY_MS = 10000; // 10 seconds
 
-const supabase = createClient(supabaseUrl, supabaseKey);
+export async function getAppreciationLevel(userId) {
+  const { data, error } = await supabase
+    .from("friend_matrix")
+    .select("appreciation")
+    .eq("user_id", userId)
+    .single();
 
-export default supabase;
+  if (error || !data) {
+    console.warn(`Appreciation fetch fallback for ${userId}:`, error?.message || "No data");
+    return DEFAULT_APPRECIATION;
+  }
+
+  return data.appreciation;
+}
+
+export async function getResponseDelay(userId) {
+  const level = await getAppreciationLevel(userId);
+  const clampedLevel = Math.max(0, Math.min(MAX_APPRECIATION, level));
+  const delay = MAX_DELAY_MS - (clampedLevel * (MAX_DELAY_MS / MAX_APPRECIATION));
+  return delay;
+}
+
+export async function setAppreciationLevel(userId, level) {
+  const appreciation = Math.max(0, Math.min(MAX_APPRECIATION, level));
+  const { data, error } = await supabase
+    .from("friend_matrix")
+    .upsert({ user_id: userId, appreciation });
+
+  if (error) {
+    console.error(`Failed to update appreciation for ${userId}:`, error.message);
+    return false;
+  }
+
+  return true;
+}
