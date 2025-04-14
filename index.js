@@ -21,41 +21,22 @@ client.once("ready", () => {
 client.on("messageCreate", async (message) => {
   if (message.author.bot) return;
 
-  try {
-    const response = await openai.chat.completions.create({
-      model: "gpt-3.5-turbo",
-      messages: [
-        { role: "system", content: "You are Oubliette, a smart, mysterious, slightly snarky AI assistant with an ancient knowledge core." },
-        { role: "user", content: message.content },
-      ],
-    });
-
-    const reply = response.choices[0]?.message?.content;
-    if (reply) {
-      message.reply(reply);
-    }
-  } catch (error) {
-    console.error("OpenAI error:", error);
-    message.reply("Hmm... something went wrong with my mind palace.");
-  }
-});
-
-// Login to Discord
-client.login(process.env.DISCORD_TOKEN);
-
-client.on("messageCreate", async (message) => {
-  if (message.author.bot) return;
-
   const content = message.content.toLowerCase();
   const triggerNames = ["oubliette", "liette", "oubie", "dark oracle", "oracle"];
   const mentionedName = triggerNames.find(name => content.includes(name));
-  if (!mentionedName) return;
-
-  // Flavor for specific nickname triggers
   let flavor = "";
+
+  // Add personality flavor based on keywords
   if (content.includes("oubie")) {
     flavor = "If I had an older brother that I hate, he would call me Oubie...";
+  } else if (content.includes("liette")) {
+    flavor = "Ah, Liette. That one I like. Short, sweet, and just cryptic enough.";
+  } else if (content.includes("dark oracle")) {
+    flavor = "You really know how to flatter a girl.";
   }
+
+  const isSummoned = mentionedName || content.startsWith("!ask");
+  if (!isSummoned) return;
 
   try {
     const response = await openai.chat.completions.create({
@@ -79,17 +60,10 @@ client.on("messageCreate", async (message) => {
       await message.reply(fullReply);
     }
   } catch (error) {
-    console.error("OpenAI error:", error);
-    message.reply("Something stirred in the shadows, but I can't quite recall what...");
+    console.error("Logic/code error:", error);
+    message.reply("Personality matrix misaligned.");
   }
 });
-
-if (message.content.toLowerCase().includes("liette")) {
-  flavor = "Ah, Liette. That one I like. Short, sweet, and just cryptic enough.";
-}
-if (content.includes("dark oracle")) {
-  flavor = "You really know how to flatter a girl.";
-}
 
 import express from 'express';
 const app = express();
