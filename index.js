@@ -2,6 +2,14 @@ import { Client, GatewayIntentBits } from "discord.js";
 import OpenAI from "openai";
 import "dotenv/config";
 import express from "express";
+import {
+  getAppreciationLevel,
+  getResponseDelay,
+} from "./friendMatrix.js";
+
+// Constants
+const MODEL = "gpt-4o";
+const OWNER_ID = process.env.OWNER_ID;
 
 // Discord setup
 const client = new Client({
@@ -9,6 +17,7 @@ const client = new Client({
     GatewayIntentBits.Guilds,
     GatewayIntentBits.GuildMessages,
     GatewayIntentBits.MessageContent,
+    GatewayIntentBits.DirectMessages,
   ],
 });
 
@@ -17,23 +26,25 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-const MODEL = "gpt-4o"; // Try switching to "gpt-3.5-turbo" if needed
-
 // When bot is ready
 client.once("ready", () => {
   console.log(`Logged in as ${client.user.tag}`);
 });
 
-// When a message is received
+// Message handler
 client.on("messageCreate", async (message) => {
   if (message.author.bot || !message.content) return;
 
   const content = message.content.toLowerCase();
   const triggerNames = ["oubliette", "liette", "oubie", "dark oracle", "oracle"];
-  const mentionedName = triggerNames.find(name => content.includes(name));
-  let flavor = "";
+  const mentionedName = triggerNames.find((name) => content.includes(name));
+  const isDM = message.channel.type === 1; // DMChannel
+  const isSummoned = mentionedName || content.startsWith("!ask");
+
+  if (!isDM && !isSummoned) return;
 
   // Add personality flavor
+  let flavor = "";
   if (content.includes("oubie")) {
     flavor = "If I had an older brother that I hate, he would call me Oubie...";
   } else if (content.includes("liette")) {
@@ -42,37 +53,38 @@ client.on("messageCreate", async (message) => {
     flavor = "You really know how to flatter a girl.";
   }
 
-  const isSummoned = mentionedName || content.startsWith("!ask");
-  if (!isSummoned) return;
+  // Respect appreciation delay
+  const delay = getResponseDelay(message.author.id);
+  setTimeout(async () => {
+    try {
+      const response = await openai.chat.completions.create({
+        model: MODEL,
+        messages: [
+          {
+            role: "system",
+            content:
+              "You are Oubliette, a smart, mysterious, slightly snarky AI assistant with an ancient knowledge core. You are known by many names: Oubliette, Liette, Oubie, the Dark Oracle, and more. Keep your tone clever and just a little mischievous, but never mean.",
+          },
+          {
+            role: "user",
+            content: message.content,
+          },
+        ],
+      });
 
-  try {
-    const response = await openai.chat.completions.create({
-      model: MODEL,
-      messages: [
-        {
-          role: "system",
-          content:
-            "You are Oubliette, a smart, mysterious, slightly snarky AI assistant with an ancient knowledge core. You are known by many names: Oubliette, Liette, Oubie, the Dark Oracle, and more. Keep your tone clever and just a little mischievous, but never mean.",
-        },
-        {
-          role: "user",
-          content: message.content,
-        },
-      ],
-    });
-
-    const reply = response.choices[0]?.message?.content;
-    if (reply) {
-      const fullReply = flavor ? `${flavor}\n\n${reply}` : reply;
-      await message.reply(fullReply);
+      const reply = response.choices[0]?.message?.content;
+      if (reply) {
+        const fullReply = flavor ? `${flavor}\n\n${reply}` : reply;
+        await message.reply(fullReply);
+      }
+    } catch (error) {
+      console.error("OpenAI API error:", error.response?.data || error.message);
+      await message.reply("Personality matrix misaligned.");
     }
-  } catch (error) {
-    console.error("OpenAI API error:", error.response?.data || error.message);
-    await message.reply("Personality matrix misaligned.");
-  }
+  }, delay);
 });
 
-// Health check + status
+// Health check server
 const app = express();
 const PORT = process.env.PORT || 3000;
 
